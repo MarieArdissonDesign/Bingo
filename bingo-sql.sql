@@ -16,3 +16,4 @@ alter table items enable row level security;
 create policy "Lecture publique" on items for select using (true);
 create policy "Ajout public" on items for insert with check (true);
 create policy "Validation publique" on items for update using (true);
+create policy "Suppression publique" on items for delete using (true);

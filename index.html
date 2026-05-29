@@ -257,6 +257,143 @@
       line-height: 1.6;
     }
 
+    /* --- Bouton gérer --- */
+    .manage-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0 auto 28px;
+      padding: 10px 18px;
+      border-radius: 100px;
+      border: 1.5px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.05);
+      color: rgba(255,255,255,0.6);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .manage-btn:hover { background: rgba(255,255,255,0.1); color: #fff; border-color: rgba(255,255,255,0.3); }
+    .manage-btn:active { transform: scale(0.97); }
+
+    /* --- Modale --- */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(6px);
+      z-index: 100;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: #1e1b3a;
+      border-radius: 24px 24px 0 0;
+      width: 100%;
+      max-width: 640px;
+      max-height: 80dvh;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: env(safe-area-inset-bottom);
+      animation: slideUp 0.25s ease;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0); }
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      flex-shrink: 0;
+    }
+
+    .modal-header h2 {
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .modal-close {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .modal-close:hover { background: rgba(255,255,255,0.2); }
+
+    .modal-list {
+      overflow-y: auto;
+      padding: 12px 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .modal-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      font-size: 0.9rem;
+    }
+
+    .modal-item span {
+      flex: 1;
+      line-height: 1.3;
+    }
+
+    .modal-item.checked-row span { color: #f9d423; }
+
+    .delete-btn {
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: none;
+      background: rgba(255, 78, 80, 0.15);
+      color: #ff4e50;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      transition: background 0.15s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .delete-btn:hover { background: rgba(255, 78, 80, 0.3); }
+    .delete-btn:active { transform: scale(0.92); }
+
+    .modal-empty {
+      text-align: center;
+      color: rgba(255,255,255,0.25);
+      font-size: 0.9rem;
+      padding: 32px 0;
+    }
+
     /* --- Toast (fixé au-dessus du bas, safe area iOS) --- */
     .toast {
       position: fixed;
@@ -305,6 +442,21 @@
 
     <p class="list-title">Toutes les prédictions</p>
     <div class="items-list" id="itemsList"></div>
+
+    <button class="manage-btn" id="manageBtn" style="margin-top:20px;">
+      🗑 Gérer les prédictions
+    </button>
+  </div>
+
+  <!-- Modale suppression -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Supprimer des prédictions</h2>
+        <button class="modal-close" id="modalClose">✕</button>
+      </div>
+      <div class="modal-list" id="modalList"></div>
+    </div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -328,6 +480,7 @@
       if (error) { console.error(error); return; }
       allItems = data || [];
       render();
+      if (modalOverlay && modalOverlay.classList.contains('open')) renderModalList();
     }
 
     // --- Realtime ---
@@ -475,6 +628,58 @@
       toast.classList.add('show');
       clearTimeout(toastTimeout);
       toastTimeout = setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    // --- Modale suppression ---
+    const modalOverlay = document.getElementById('modalOverlay');
+    const modalList = document.getElementById('modalList');
+
+    document.getElementById('manageBtn').addEventListener('click', openModal);
+    document.getElementById('modalClose').addEventListener('click', closeModal);
+    modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) closeModal(); });
+
+    function openModal() {
+      renderModalList();
+      modalOverlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+      modalOverlay.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    function renderModalList() {
+      modalList.innerHTML = '';
+
+      if (allItems.length === 0) {
+        modalList.innerHTML = '<p class="modal-empty">Aucune prédiction à supprimer.</p>';
+        return;
+      }
+
+      allItems.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'modal-item' + (item.checked ? ' checked-row' : '');
+
+        const label = document.createElement('span');
+        label.textContent = item.text;
+
+        const btn = document.createElement('button');
+        btn.className = 'delete-btn';
+        btn.title = 'Supprimer';
+        btn.innerHTML = '🗑';
+        btn.addEventListener('click', () => deleteItem(item.id));
+
+        row.appendChild(label);
+        row.appendChild(btn);
+        modalList.appendChild(row);
+      });
+    }
+
+    async function deleteItem(id) {
+      const { error } = await db.from('items').delete().eq('id', id);
+      if (error) { showToast('Erreur lors de la suppression 😬'); return; }
+      showToast('Prédiction supprimée');
     }
 
     // --- Init ---
