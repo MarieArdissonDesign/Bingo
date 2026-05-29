@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎉 Bingo Soirée</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f0c29;
+      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+      min-height: 100vh;
+      color: #fff;
+      padding: 24px 16px 48px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    header h1 {
+      font-size: 2.4rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+      background: linear-gradient(90deg, #f9d423, #ff4e50);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    header p {
+      color: #aaa;
+      margin-top: 6px;
+      font-size: 0.95rem;
+    }
+
+    .container {
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    /* --- Formulaire --- */
+    .add-form {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 32px;
+    }
+
+    .add-form input {
+      flex: 1;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 2px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.07);
+      color: #fff;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .add-form input::placeholder { color: rgba(255,255,255,0.35); }
+    .add-form input:focus { border-color: #f9d423; }
+
+    .add-form button {
+      padding: 12px 20px;
+      border-radius: 12px;
+      border: none;
+      background: linear-gradient(135deg, #f9d423, #ff4e50);
+      color: #fff;
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      white-space: nowrap;
+    }
+
+    .add-form button:hover { opacity: 0.9; transform: scale(1.02); }
+    .add-form button:active { transform: scale(0.98); }
+    .add-form button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* --- Compteur --- */
+    .counter {
+      text-align: center;
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.45);
+      margin-bottom: 20px;
+    }
+
+    .counter span {
+      color: #f9d423;
+      font-weight: 700;
+    }
+
+    /* --- Grille Bingo --- */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      margin-bottom: 32px;
+    }
+
+    .cell {
+      aspect-ratio: 1;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 6px;
+      line-height: 1.2;
+      border: 2px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.05);
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s, border-color 0.2s;
+      word-break: break-word;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .cell:hover:not(.free):not(.empty) {
+      border-color: rgba(249,212,35,0.5);
+      background: rgba(249,212,35,0.08);
+      transform: scale(1.04);
+    }
+
+    .cell.checked {
+      background: linear-gradient(135deg, rgba(249,212,35,0.25), rgba(255,78,80,0.25));
+      border-color: #f9d423;
+      color: #f9d423;
+    }
+
+    .cell.free {
+      background: linear-gradient(135deg, #f9d423, #ff4e50);
+      border-color: transparent;
+      color: #fff;
+      font-size: 1.4rem;
+      cursor: default;
+      font-weight: 900;
+    }
+
+    .cell.empty {
+      opacity: 0.2;
+      cursor: default;
+      font-size: 1.2rem;
+    }
+
+    /* --- Bingo Banner --- */
+    .bingo-banner {
+      display: none;
+      text-align: center;
+      font-size: 3rem;
+      font-weight: 900;
+      margin-bottom: 20px;
+      background: linear-gradient(90deg, #f9d423, #ff4e50, #f9d423);
+      background-size: 200%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shimmer 1.5s infinite;
+    }
+
+    .bingo-banner.show { display: block; }
+
+    @keyframes shimmer {
+      0% { background-position: 0% }
+      100% { background-position: 200% }
+    }
+
+    /* --- Liste des items --- */
+    .list-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: rgba(255,255,255,0.35);
+      margin-bottom: 10px;
+    }
+
+    .items-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .item-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .item-row:hover { background: rgba(255,255,255,0.08); }
+
+    .item-row.checked-row {
+      background: rgba(249,212,35,0.07);
+      border-color: rgba(249,212,35,0.2);
+      color: #f9d423;
+    }
+
+    .check-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.25);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+    }
+
+    .item-row.checked-row .check-icon {
+      background: #f9d423;
+      border-color: #f9d423;
+      color: #000;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: rgba(255,255,255,0.25);
+      font-size: 0.9rem;
+      padding: 24px;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #f9d423;
+      color: #000;
+      font-weight: 700;
+      padding: 10px 20px;
+      border-radius: 100px;
+      font-size: 0.9rem;
+      transition: transform 0.3s;
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    .toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🎉 Bingo Soirée</h1>
+      <p>Ajoute tes prédictions — coche quand ça arrive !</p>
+    </header>
+
+    <form class="add-form" id="addForm">
+      <input type="text" id="itemInput" placeholder="Ta prédiction..." maxlength="80" required />
+      <button type="submit" id="addBtn">Ajouter</button>
+    </form>
+
+    <p class="counter" id="counter">Chargement…</p>
+
+    <div class="bingo-banner" id="bingoBanner">🎊 BINGO ! 🎊</div>
+
+    <div class="grid" id="grid"></div>
+
+    <p class="list-title">Toutes les prédictions</p>
+    <div class="items-list" id="itemsList"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const SUPABASE_URL = 'https://achehxsvkktmqlklmonw.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjaGVoeHN2a2t0bXFsa2xtb253Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMjkxODEsImV4cCI6MjA5NTYwNTE4MX0.zwpiq3WLfc14V1DlKynbAQ41XoUW17jjw3ImOte7ycE';
+
+    const { createClient } = supabase;
+    const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let allItems = [];
+
+    // --- Chargement initial ---
+    async function loadItems() {
+      const { data, error } = await db
+        .from('items')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) { console.error(error); return; }
+      allItems = data || [];
+      render();
+    }
+
+    // --- Realtime ---
+    db.channel('items-channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'items' }, () => {
+        loadItems();
+      })
+      .subscribe();
+
+    // --- Ajouter un item ---
+    document.getElementById('addForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = document.getElementById('itemInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const btn = document.getElementById('addBtn');
+      btn.disabled = true;
+
+      const { error } = await db.from('items').insert({ text });
+      if (error) {
+        showToast('Erreur lors de l\'ajout 😬');
+        console.error(error);
+      } else {
+        input.value = '';
+        showToast('Prédiction ajoutée !');
+      }
+
+      btn.disabled = false;
+    });
+
+    // --- Cocher / décocher ---
+    async function toggleItem(id, currentChecked) {
+      await db.from('items').update({ checked: !currentChecked }).eq('id', id);
+    }
+
+    // --- Rendu ---
+    function render() {
+      renderCounter();
+      renderGrid();
+      renderList();
+      checkBingo();
+    }
+
+    function renderCounter() {
+      const total = allItems.length;
+      const checked = allItems.filter(i => i.checked).length;
+      const gridItems = Math.min(total, 24); // 24 + FREE center
+      document.getElementById('counter').innerHTML =
+        `<span>${checked}</span> cochée${checked > 1 ? 's' : ''} sur <span>${total}</span> prédiction${total > 1 ? 's' : ''} — grille : <span>${gridItems}/24</span> cases remplies`;
+    }
+
+    function renderGrid() {
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+
+      // Items pour la grille : les 24 premiers (position 12 = FREE)
+      const gridItems = allItems.slice(0, 24);
+
+      for (let i = 0; i < 25; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+
+        if (i === 12) {
+          // Case centrale FREE
+          cell.classList.add('free');
+          cell.textContent = '⭐';
+        } else {
+          const itemIndex = i < 12 ? i : i - 1;
+          const item = gridItems[itemIndex];
+
+          if (item) {
+            if (item.checked) cell.classList.add('checked');
+            cell.textContent = item.text;
+            cell.title = item.text;
+            cell.addEventListener('click', () => toggleItem(item.id, item.checked));
+          } else {
+            cell.classList.add('empty');
+            cell.textContent = '?';
+          }
+        }
+
+        grid.appendChild(cell);
+      }
+    }
+
+    function renderList() {
+      const list = document.getElementById('itemsList');
+      list.innerHTML = '';
+
+      if (allItems.length === 0) {
+        list.innerHTML = '<p class="empty-state">Aucune prédiction pour l\'instant.<br>Sois le premier ! 🎯</p>';
+        return;
+      }
+
+      allItems.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'item-row' + (item.checked ? ' checked-row' : '');
+
+        const icon = document.createElement('div');
+        icon.className = 'check-icon';
+        icon.textContent = item.checked ? '✓' : '';
+
+        const label = document.createElement('span');
+        label.textContent = item.text;
+
+        row.appendChild(icon);
+        row.appendChild(label);
+        row.addEventListener('click', () => toggleItem(item.id, item.checked));
+        list.appendChild(row);
+      });
+    }
+
+    function checkBingo() {
+      // Vérifie si une ligne/colonne/diagonale est complète dans la grille 5x5
+      const banner = document.getElementById('bingoBanner');
+
+      // Construire un tableau 5x5 de booléens (checked ou free)
+      const gridItems = allItems.slice(0, 24);
+      const cells = [];
+      for (let i = 0; i < 25; i++) {
+        if (i === 12) { cells.push(true); continue; }
+        const idx = i < 12 ? i : i - 1;
+        cells.push(gridItems[idx] ? gridItems[idx].checked : false);
+      }
+
+      const wins = [
+        // Lignes
+        [0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24],
+        // Colonnes
+        [0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24],
+        // Diagonales
+        [0,6,12,18,24],[4,8,12,16,20]
+      ];
+
+      const hasBingo = wins.some(line => line.every(idx => cells[idx]));
+      banner.classList.toggle('show', hasBingo);
+    }
+
+    // --- Toast ---
+    let toastTimeout;
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    // --- Init ---
+    loadItems();
+  </script>
+</body>
+</html>
